@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Estoque</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f0f8f5;
+    color: #333;
+    padding: 20px;
+  }
+
+  h1 { text-align:center; color:#007a3d; }
+  h2 { text-align:center; color:#007a3d; }
+
+  ul#fila { list-style:none; padding:0; max-width:600px; margin:0 auto; }
+  ul#fila li {
+    background:#fff; padding:12px 15px; margin-bottom:12px;
+    border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,0.1);
+  }
+
+  ul#fila li strong { color:#007a3d; font-size:16px; }
+
+  textarea {
+    width:100%; padding:6px 8px; margin:5px 0; border-radius:4px;
+    border:1px solid #ccc; font-size:13px;
+  }
+
+  button {
+    padding:6px 10px; margin-right:5px;
+    background-color:#007a3d; color:#fff; border:none; border-radius:4px;
+    font-size:13px; cursor:pointer; transition:0.3s;
+  }
+  button:hover { background-color:#00572c; }
+
+  /* ===================
+     Obs Caixa vermelho
+     =================== */
+  .obs-caixa {
+    color: red;
+    margin-top: 4px;
+    font-size: 13px;
+  }
+
+</style>
+</head>
+<body>
+
+<h1>Tela do Estoque</h1>
+<h2>Fila de Clientes</h2>
+<ul id="fila"></ul>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+var socket = io();
+
+// Som de "Novo Pedido"
+var somNovo = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+somNovo.volume = 0.6;
+somNovo.load();
+
+// desbloquear som no clique
+document.body.addEventListener('click', ()=>{
+  somNovo.play().then(()=>somNovo.pause());
+}, {once:true});
+
+var tamanhoAnterior = 0;
+
+// renderizar fila
+socket.on("fila-atualizada", function(fila){
+  var lista = document.getElementById("fila");
+  lista.innerHTML = "";
+
+  if(fila.length > tamanhoAnterior) somNovo.play();
+  tamanhoAnterior = fila.length;
+
+  for(var i=0; i<fila.length; i++){
+    var cliente = fila[i];
+
+    var item = document.createElement("li");
+    item.innerHTML =
+      "<strong>" + (i+1) + " - " + cliente.nome + "</strong> (Venda " + cliente.venda + ")<br>" +
+      "<div class='obs-caixa'>Obs Caixa: " + cliente.obsCaixa + "</div>" +
+      "<textarea id='obs-" + i + "' placeholder='Obs do estoque'>" + cliente.obsEstoque + "</textarea><br>" +
+      "<button onclick='salvarObs(" + i + ")'>Salvar Obs</button>" +
+      "<button onclick='removerCliente(" + i + ")'>✔ Entregue</button>";
+
+    lista.appendChild(item);
+  }
+});
+
+function salvarObs(index){
+  var texto = document.getElementById("obs-"+index).value;
+  socket.emit("atualizar-estoque",{index:index, obsEstoque:texto});
+}
+
+function removerCliente(index){
+  socket.emit('pedido-entregue'); // dispara som/notification no Caixa
+  socket.emit("remover-cliente", index); // remove cliente
+}
+</script>
+
+</body>
+</html>

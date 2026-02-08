@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Caixa</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #f8f9fa;
+    color: #333;
+    padding: 20px;
+  }
+
+  h1 {
+    text-align: center;
+    color: #2c3e50;
+  }
+
+  .form-container {
+    max-width: 400px;
+    margin: 0 auto 20px auto;
+    background: #fff;
+    padding: 15px 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  }
+
+  .form-container input {
+    width: 100%;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+  }
+
+  .form-container button {
+    width: 100%;
+    padding: 10px;
+    background-color: #2c3e50;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  .form-container button:hover {
+    background-color: #1a252f;
+  }
+
+  h2 {
+    text-align: center;
+    color: #2c3e50;
+  }
+
+  ul#fila {
+    list-style: none;
+    padding: 0;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  ul#fila li {
+    background: #fff;
+    padding: 12px 15px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  ul#fila li strong {
+    color: #2c3e50;
+    font-size: 16px;
+  }
+
+  .obs {
+    font-size: 13px;
+    color: #555;
+    margin-top: 4px;
+  }
+
+  /* ===================
+     Obs Estoque vermelho
+     =================== */
+  .obs-estoque {
+    color: red;
+  }
+
+</style>
+</head>
+<body>
+
+<h1>Caixa</h1>
+
+<div class="form-container">
+  <input id="nome" placeholder="Nome do Cliente">
+  <input id="venda" placeholder="Numeração da Venda">
+  <input id="obsCaixa" placeholder="Observação">
+  <button id="adicionar">Adicionar à Fila</button>
+</div>
+
+<h2>Fila Atual</h2>
+<ul id="fila"></ul>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io();
+
+  // Som de "Entregue"
+  var somEntregue = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_snap.ogg");
+  somEntregue.volume = 0.5;
+  somEntregue.load();
+
+  // desbloquear som no primeiro clique
+  document.body.addEventListener('click', () => {
+    somEntregue.play().then(()=>somEntregue.pause()).catch(()=>{});
+  }, {once:true});
+
+  // tocar som/notification quando Estoque clicar "Entregue"
+  socket.on('pedido-entregue', () => {
+    if(Notification.permission === "granted") {
+      new Notification("Pedido Entregue!", {
+        body: "Cliente entregue pelo Estoque",
+        icon: "https://cdn-icons-png.flaticon.com/512/61/61455.png"
+      });
+    } else {
+      Notification.requestPermission().then(permission => {
+        if(permission === "granted") {
+          new Notification("Pedido Entregue!", {
+            body: "Cliente entregue pelo Estoque",
+            icon: "https://cdn-icons-png.flaticon.com/512/61/61455.png"
+          });
+        }
+      });
+    }
+  });
+
+  // Adicionar cliente
+  document.getElementById('adicionar').addEventListener('click', ()=>{
+    const nome = document.getElementById('nome').value;
+    const venda = document.getElementById('venda').value;
+    const obsCaixa = document.getElementById('obsCaixa').value;
+
+    if(!nome || !venda) return alert("Preencha Nome e Venda");
+
+    socket.emit('adicionar-cliente', {
+      nome, venda, obsCaixa, obsEstoque:''
+    });
+
+    // avisar Estoque que chegou novo pedido
+    socket.emit('novo-pedido');
+
+    document.getElementById('nome').value='';
+    document.getElementById('venda').value='';
+    document.getElementById('obsCaixa').value='';
+  });
+
+  // Renderizar fila
+  socket.on('fila-atualizada', fila=>{
+    const lista = document.getElementById('fila');
+    lista.innerHTML='';
+    fila.forEach((c,i)=>{
+      lista.innerHTML += `
+        <li>
+          <strong>${i+1} - ${c.nome}</strong> (Venda ${c.venda})
+          <div class="obs">Obs Caixa: ${c.obsCaixa}</div>
+          <div class="obs obs-estoque">Obs Estoque: ${c.obsEstoque}</div>
+        </li>
+      `;
+    });
+  });
+</script>
+
+</body>
+</html>
